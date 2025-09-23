@@ -1,0 +1,18 @@
+spring:
+  application:
+    name: ai-page-gen-backend
+server:
+  port: 8123
+  servlet:
+    context-path: /api
+# springdoc-openapi 文档：http://localhost:8123/api/doc.html
+springdoc:
+  group-configs:
+    - group: 'default'
+      paths-to-match: "/**"
+      packages-to-scan: com.miu.codemain.controller
+# knife4j
+knife4j:
+  enable: true
+  setting:
+    language: zh_cn
