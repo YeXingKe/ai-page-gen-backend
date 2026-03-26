@@ -4,6 +4,13 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+
+### custom ###
+genresult
+tmp
+application-local.yml
+
+
 ### STS ###
 .apt_generated
 .classpath
