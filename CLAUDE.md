@@ -46,8 +46,8 @@ Tests are located in `src/test/java/` and use Spring Boot's test framework.
 - **VUE_PROJECT**: Planned but not yet implemented (would use tool calling system)
 
 ### Tool System (for future Vue project generation)
-- **BaseTool** ([src/main/java/com/miu/codemain/ai/tool/BaseTool.java](src/main/java/com/miu/codemain/ai/tool/BaseTool.java)): Abstract base class for AI tools.
-- **ToolManager** ([src/main/java/com/miu/codemain/ai/tool/ToolManager.java](src/main/java/com/miu/codemain/ai/tool/ToolManager.java)): Registers and manages all tool instances via Spring dependency injection.
+- **BaseTool** ([src/main/java/com/miu/codemain/ai/tool/BaseTool.java](src/main/java/com/miu/codemain/ai/tools/BaseTool.java)): Abstract base class for AI tools.
+- **ToolManager** ([src/main/java/com/miu/codemain/ai/tool/ToolManager.java](src/main/java/com/miu/codemain/ai/tools/ToolManager.java)): Registers and manages all tool instances via Spring dependency injection.
 - Tools would enable AI to perform actions like creating files, installing dependencies, etc.
 
 ### Data Layer

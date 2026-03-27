@@ -1,4 +1,4 @@
-package com.miu.codemain.ai.tool;
+package com.miu.codemain.ai.tools;
 
 import cn.hutool.json.JSONObject;
 

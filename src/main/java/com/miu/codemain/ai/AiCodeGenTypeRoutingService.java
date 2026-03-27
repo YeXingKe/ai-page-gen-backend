@@ -1,5 +1,4 @@
-package com.miu.codemain.ai.tool;
-
+package com.miu.codemain.ai;
 import com.miu.codemain.model.enums.CodeGenTypeEnum;
 import dev.langchain4j.service.SystemMessage;
 
