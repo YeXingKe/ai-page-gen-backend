@@ -2,8 +2,9 @@
 
 > 项目名称：ai-page-gen-backend
 > 项目描述：基于Spring Boot 3.5.6和LangChain4j的AI驱动Web页面生成系统
-> 技术栈：Java 21、Spring Boot 3.5.6、LangChain4j 1.1.0、MyBatis Flex 1.11.0
+> 技术栈：Java 21、Spring Boot 3.5.6、LangChain4j 1.1.0、MyBatis Flex 1.11.1
 > 文档生成时间：2026-03-27
+> 最后更新：2026-04-02
 
 ---
 
@@ -124,9 +125,10 @@
   - 工具调用能力
   - 对话记忆管理
 - **LangGraph4j 1.6.0-rc2**：状态机式AI工作流
+- **阿里云 DashScope SDK 2.21.1**：通义千问等阿里云大模型接入
 
 #### 数据层
-- **MyBatis Flex 1.11.0**：增强版MyBatis，支持代码生成
+- **MyBatis Flex 1.11.1**：增强版MyBatis，支持代码生成
 - **MySQL**：主数据库
 - **Redis + Jedis**：缓存和会话存储
 - **Redisson 3.50.0**：分布式限流
@@ -137,6 +139,7 @@
 - **Lombok 1.18.36**：代码简化
 - **Caffeine**：本地缓存
 - **Selenium**：网页截图
+- **腾讯云 COS 5.6.227**：对象存储（可选）
 
 ---
 
@@ -730,6 +733,74 @@ public enum CodeGenTypeEnum {
 
 ### 6. 配置模块 (config包)
 
+#### 启动类配置 - AiPageGenBackendApplication.java
+
+```java
+@SpringBootApplication(exclude = RedisEmbeddingStoreAutoConfiguration.class)
+@MapperScan("com.miu.codemain.mapper")
+public class AiPageGenBackendApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(AiPageGenBackendApplication.class, args);
+    }
+}
+```
+
+**关键配置**：
+- `exclude = RedisEmbeddingStoreAutoConfiguration.class`：排除 LangChain4j 的向量嵌入存储自动配置，避免对 RediSearch 模块的依赖
+- `@MapperScan`：指定 MyBatis Mapper 接口扫描路径
+
+#### CosClientConfig.java - 腾讯云 COS 配置（可选）
+
+```java
+@Configuration
+@ConfigurationProperties(prefix = "cos.client")
+@ConditionalOnProperty(prefix = "cos.client", name = "secretId")
+@Data
+public class CosClientConfig {
+    private String secretId;
+    private String secretKey;
+    private String region;
+    private String bucket;
+
+    @Bean
+    public COSClient cosClient() {
+        COSCredentials cred = new BasicCOSCredentials(secretId, secretKey);
+        ClientConfig clientConfig = new ClientConfig(new Region(region));
+        return new COSClient(cred, clientConfig);
+    }
+}
+```
+
+**条件配置**：
+- 只有当配置了 `cos.client.secretId` 时才会创建 COSClient Bean
+- 未配置时该功能自动跳过，不影响系统运行
+
+#### RedisChatMemoryStoreConfig.java - Redis 对话记忆配置
+
+```java
+@Configuration
+@ConfigurationProperties(prefix = "spring.data.redis")
+@Data
+public class RedisChatMemoryStoreConfig {
+    private String host;
+    private int port;
+    private String password;
+    private long ttl;
+
+    @Bean
+    public RedisChatMemoryStore redisChatMemoryStore() {
+        return RedisChatMemoryStore.builder()
+                .host(host)
+                .port(port)
+                .password(password)
+                .ttl(ttl)
+                .build();
+    }
+}
+```
+
+**作用**：为 LangChain4j 提供 Redis 存储的 AI 对话历史功能
+
 #### CorsConfig.java - 跨域配置
 ```java
 @Configuration
@@ -850,6 +921,9 @@ spring:
       password:
       ttl: 3600                    # 缓存1小时过期
 
+# 注意：项目已排除 RedisEmbeddingStore 自动配置
+# 如需使用向量嵌入功能，需要在启动类中移除 exclude 参数并安装 Redis Stack
+
   profiles:
     active: local                  # 激活本地环境配置
 
@@ -898,25 +972,29 @@ langchain4j:
    - spring-boot-starter-aop：AOP支持
 
 2. **数据存储**
-   - mybatis-flex-spring-boot3-starter：ORM框架
+   - mybatis-flex-spring-boot3-starter 1.11.1：ORM框架
    - mysql-connector-j：MySQL驱动
    - spring-session-data-redis：Session存储
-   - redisson：分布式功能
+   - redisson 3.50.0：分布式功能
 
 3. **AI集成**
-   - langchain4j：AI编排框架
+   - langchain4j 1.1.0：AI编排框架
    - langchain4j-open-ai-spring-boot-starter：OpenAI兼容接口
    - langchain4j-reactor：响应式支持
-   - langgraph4j-core：状态机工作流
+   - langchain4j-community-redis-spring-boot-starter：Redis集成
+   - langgraph4j-core 1.6.0-rc2：状态机工作流
+   - langgraph4j-studio-springboot 1.6.0-rc2：可视化调试界面
+   - dashscope-sdk-java 2.21.1：阿里云大模型SDK
 
 4. **工具库**
-   - hutool-all：Java工具集
-   - lombok：代码简化
-   - knife4j-openapi3-jakarta-spring-boot-starter：API文档
+   - hutool-all 5.8.38：Java工具集
+   - lombok 1.18.36：代码简化
+   - knife4j-openapi3-jakarta-spring-boot-starter 4.4.0：API文档
 
 5. **其他**
-   - selenium-java：网页截图
-   - cos_api：腾讯云对象存储
+   - selenium-java 4.33.0：网页截图
+   - webdrivermanager 6.1.0：浏览器驱动管理
+   - cos_api 5.6.227：腾讯云对象存储（可选）
    - caffeine：本地缓存
 
 ---
@@ -1488,12 +1566,16 @@ public class AuthInterceptor {
 - Java 21+
 - Maven 3.6+
 - MySQL 8.0+
-- Redis 6.0+
+- Redis 6.0+（标准版即可，不需要 Redis Stack）
 
 **系统配置**：
 - 内存：至少2GB
 - 磁盘：至少10GB可用空间
 - 网络：可访问DeepSeek API
+
+**可选依赖**：
+- 腾讯云 COS：对象存储（用于部署截图等功能）
+- Docker：用于快速启动 Redis
 
 ### 本地开发环境搭建
 
@@ -1520,8 +1602,16 @@ langchain4j.open-ai.chat-model.api-key: your_deepseek_api_key
 
 4. **启动Redis**
 ```bash
+# Windows 用户
+redis-server.exe
+
+# macOS/Linux 用户
 redis-server
+# 或使用 Docker
+docker run -d -p 6379:6379 --name redis redis:7-alpine
 ```
+
+**注意**：本项目使用标准 Redis 即可，不需要安装 Redis Stack 或 RediSearch 模块。
 
 5. **编译运行**
 ```bash
@@ -1639,6 +1729,8 @@ curl http://localhost:8123/api/health
 4. **工具系统**：为复杂项目生成准备工具调用能力
 5. **完善监控**：全链路监控AI调用指标
 6. **分布式支持**：Redis Session + Redisson限流
+7. **多模型支持**：支持 DeepSeek、阿里云通义千问等多种大模型
+8. **条件配置**：使用 `@ConditionalOnProperty` 实现可选功能优雅降级
 
 ### 架构优势
 
@@ -1664,7 +1756,122 @@ curl http://localhost:8123/api/health
 
 ---
 
-> **文档版本**：v1.0
-> **更新日期**：2026-03-27
+## 环境配置常见问题
+
+### 问题 1：CosClientConfig 报错 "Access key cannot be null"
+
+**原因**：项目包含腾讯云 COS 依赖，但未配置密钥
+
+**解决方案**：
+1. 如果不需要使用腾讯云 COS，无需配置（已通过 `@ConditionalOnProperty` 注解自动跳过）
+2. 如需使用，在 `application.yml` 中添加：
+```yaml
+cos:
+  client:
+    secret-id: your-secret-id
+    secret-key: your-secret-key
+    region: ap-guangzhou
+    bucket: your-bucket-name
+```
+
+### 问题 2：RedisEmbeddingStore 报错 "ERR unknown command 'FT._LIST'"
+
+**原因**：LangChain4j 的 Redis Embedding Store 需要 RediSearch 模块
+
+**解决方案**：
+1. 本地开发：已在启动类中排除该自动配置
+```java
+@SpringBootApplication(exclude = RedisEmbeddingStoreAutoConfiguration.class)
+```
+2. 如果需要使用向量嵌入功能，安装 Redis Stack：
+```bash
+docker run -d -p 6379:6379 redis/redis-stack-server:latest
+```
+
+### 问题 3：Redis 连接失败
+
+**原因**：Redis 服务未启动或端口不正确
+
+**解决方案**：
+1. 检查 Redis 是否运行：
+```bash
+redis-cli ping
+# 应返回 PONG
+```
+2. 如未安装，使用 Docker 快速启动：
+```bash
+docker run -d -p 6379:6379 --name redis redis:7-alpine
+```
+3. 检查配置文件中的 Redis 地址和端口
+
+### 问题 4：DeepSeek API Key 未配置
+
+**原因**：未设置 AI 模型的 API 密钥
+
+**解决方案**：
+1. 访问 [DeepSeek 开放平台](https://platform.deepseek.com/) 获取 API Key
+2. 在 `application.yml` 中配置：
+```yaml
+langchain4j:
+  open-ai:
+    chat-model:
+      api-key: sk-your-actual-api-key
+    streaming-chat-model:
+      api-key: sk-your-actual-api-key
+```
+
+### 问题 5：数据库连接失败
+
+**原因**：MySQL 未启动或配置不正确
+
+**解决方案**：
+1. 检查 MySQL 服务状态
+2. 创建数据库：
+```sql
+CREATE DATABASE IF NOT EXISTS ai_page_gen;
+```
+3. 执行建表脚本：
+```bash
+mysql -u root -p ai_page_gen < sql/create_table.sql
+```
+4. 检查 `application.yml` 中的数据库连接配置
+
+---
+
+## 启动类配置说明
+
+项目启动类 `AiPageGenBackendApplication.java` 包含以下关键配置：
+
+```java
+@SpringBootApplication(exclude = RedisEmbeddingStoreAutoConfiguration.class)
+@MapperScan("com.miu.codemain.mapper")
+public class AiPageGenBackendApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(AiPageGenBackendApplication.class, args);
+    }
+}
+```
+
+**配置说明**：
+- `exclude = RedisEmbeddingStoreAutoConfiguration.class`：排除向量嵌入存储自动配置（不需要 RediSearch 模块）
+- `@MapperScan("com.miu.codemain.mapper")`：扫描 MyBatis Mapper 接口
+
+---
+
+## 条件配置说明
+
+项目使用 `@ConditionalOnProperty` 注解实现可选功能：
+
+| 配置类 | 条件 | 说明 |
+|--------|------|------|
+| `CosClientConfig` | `cos.client.secretId` | 腾讯云 COS（可选） |
+| `RedisEmbeddingStore` | 已排除 | 向量嵌入（已禁用） |
+
+未配置相关参数时，这些 Bean 不会被创建，不影响系统正常运行。
+
+---
+
+> **文档版本**：v1.1
+> **更新日期**：2026-04-02
 > **作者**：Claude Code
 > **项目地址**：[github-repo-url]
