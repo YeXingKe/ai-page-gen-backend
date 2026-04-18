@@ -24,9 +24,9 @@ public class ReasoningStreamingChatModelConfig {
 
     private String apiKey;
 
-    private String modelName;
+    private String modelName = "deepseek-chat";
 
-    private Integer maxTokens;
+    private Integer maxTokens = 8192;
 
     private Double temperature;
 

@@ -5,13 +5,20 @@ import com.miu.codemain.ai.AiCodeGeneratorService;
 import com.miu.codemain.ai.AiCodeGeneratorServiceFactory;
 import com.miu.codemain.ai.model.HtmlCodeResult;
 import com.miu.codemain.ai.model.MultiFileCodeResult;
+import com.miu.codemain.ai.model.message.AiResponseMessage;
+import com.miu.codemain.ai.model.message.ToolExecutedMessage;
+import com.miu.codemain.ai.model.message.ToolRequestMessage;
 import com.miu.codemain.constant.AppConstant;
+import com.miu.codemain.core.builder.VueProjectBuilder;
 import com.miu.codemain.core.parser.CodeParserExecutor;
 import com.miu.codemain.core.saver.CodeFileSaverExecutor;
 import com.miu.codemain.exception.BusinessException;
 import com.miu.codemain.exception.ErrorCode;
 import com.miu.codemain.model.enums.CodeGenTypeEnum;
+import dev.langchain4j.model.chat.response.ChatResponse;
+//import dev.langchain4j.service.TokenStream;
 import dev.langchain4j.service.TokenStream;
+import dev.langchain4j.service.tool.ToolExecution;
 import jakarta.annotation.Resource;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -44,8 +51,8 @@ public class AiCodeGeneratorFacade {
     private AiCodeGeneratorServiceFactory aiCodeGeneratorServiceFactory;
 
     // Vue 项目构建器（用于 Vue 项目生成，当前注释掉）
-//    @Resource
-//    private VueProjectBuilder vueProjectBuilder;
+    @Resource
+    private VueProjectBuilder vueProjectBuilder;
 
     /**
      * 统一入口：根据类型生成并保存代码（同步模式）
@@ -146,11 +153,11 @@ public class AiCodeGeneratorFacade {
                 Flux<String> codeStream = aiCodeGeneratorService.generateMultiFileCodeStream(userMessage);
                 yield processCodeStream(codeStream, CodeGenTypeEnum.MULTI_FILE, appId);
             }
-//            case VUE_PROJECT -> {
-//                // Vue 项目使用 TokenStream，支持工具调用
-//                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
-//                yield processTokenStream(tokenStream, appId);
-//            }
+            case VUE_PROJECT -> {
+                // Vue 项目使用 TokenStream，支持工具调用
+                TokenStream tokenStream = aiCodeGeneratorService.generateVueProjectCodeStream(appId, userMessage);
+                yield processTokenStream(tokenStream, appId);
+            }
             default -> {
                 String errorMessage = "不支持的生成类型：" + codeGenTypeEnum.getValue();
                 throw new BusinessException(ErrorCode.SYSTEM_ERROR, errorMessage);
@@ -158,40 +165,40 @@ public class AiCodeGeneratorFacade {
         };
     }
 
-//    /**
-//     * 将 TokenStream 转换为 Flux<String>，并传递工具调用信息
-//     *
-//     * @param tokenStream TokenStream 对象
-//     * @param appId       应用 ID
-//     * @return Flux<String> 流式响应
-//     */
-//    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
-//        return Flux.create(sink -> {
-//            tokenStream.onPartialResponse((String partialResponse) -> {
-//                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
-//                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
-//                    })
-//                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
-//                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
-//                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
-//                    })
-//                    .onToolExecuted((ToolExecution toolExecution) -> {
-//                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
-//                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
-//                    })
-//                    .onCompleteResponse((ChatResponse response) -> {
-//                        // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
-//                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
-//                        vueProjectBuilder.buildProject(projectPath);
-//                        sink.complete();
-//                    })
-//                    .onError((Throwable error) -> {
-//                        error.printStackTrace();
-//                        sink.error(error);
-//                    })
-//                    .start();
-//        });
-//    }
+    /**
+     * 将 TokenStream 转换为 Flux<String>，并传递工具调用信息
+     *
+     * @param tokenStream TokenStream 对象
+     * @param appId       应用 ID
+     * @return Flux<String> 流式响应
+     */
+    private Flux<String> processTokenStream(TokenStream tokenStream, Long appId) {
+        return Flux.create(sink -> {
+            tokenStream.onPartialResponse((String partialResponse) -> {
+                        AiResponseMessage aiResponseMessage = new AiResponseMessage(partialResponse);
+                        sink.next(JSONUtil.toJsonStr(aiResponseMessage));
+                    })
+                    .onPartialToolExecutionRequest((index, toolExecutionRequest) -> {
+                        ToolRequestMessage toolRequestMessage = new ToolRequestMessage(toolExecutionRequest);
+                        sink.next(JSONUtil.toJsonStr(toolRequestMessage));
+                    })
+                    .onToolExecuted((ToolExecution toolExecution) -> {
+                        ToolExecutedMessage toolExecutedMessage = new ToolExecutedMessage(toolExecution);
+                        sink.next(JSONUtil.toJsonStr(toolExecutedMessage));
+                    })
+                    .onCompleteResponse((ChatResponse response) -> {
+                        // 执行 Vue 项目构建（同步执行，确保预览时项目已就绪）
+                        String projectPath = AppConstant.CODE_OUTPUT_ROOT_DIR + "/vue_project_" + appId;
+                        vueProjectBuilder.buildProject(projectPath);
+                        sink.complete();
+                    })
+                    .onError((Throwable error) -> {
+                        error.printStackTrace();
+                        sink.error(error);
+                    })
+                    .start();
+        });
+    }
 
     /**
      * 通用流式代码处理方法
